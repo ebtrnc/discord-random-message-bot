@@ -4,7 +4,7 @@ discordのログをランダムで表示するbot（ChatGPT作）
 ### 書き換える箇所
 > TOKEN = 'YOUR_DISCORD_BOT_TOKEN'  # あなたのボットのトークン
 
-> SOURCE_CHANNEL_IDS = [YOUR_CHANNEL_ID_1, YOUR_CHANNEL_ID_2]  # メッセージを取得したい複数のチャネルのID
+> SOURCE_CHANNEL_IDS = [YOUR_CHANNEL_ID_1, YOUR_CHANNEL_ID_2]  # メッセージを取得したい<ins>**複数の**</ins>チャネルのID
 
 > TARGET_CHANNEL_ID = YOUR_TARGET_CHANNEL_ID  # メッセージを送信したい出力先のチャネルのID
 
