@@ -13,4 +13,4 @@ discordのログをランダムで表示するbot（ChatGPT作）
 > $ python3 discord-random-message-bot.py
 
 指定したチャンネル（メッセージを送信したい出力先のチャンネル）でコマンドを入力
-> !ran
+> !run
