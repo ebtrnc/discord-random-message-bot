@@ -17,7 +17,7 @@ TARGET_CHANNEL_ID = YOUR_TARGET_CHANNEL_ID  # メッセージを送信したい�
 async def on_ready():
     print(f'We have logged in as {bot.user}')
 
-@bot.command(name='ran')
+@bot.command(name='run')
 async def random_message(ctx):
     target_channel = bot.get_channel(TARGET_CHANNEL_ID)
     if target_channel is None:
