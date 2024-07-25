@@ -1,5 +1,5 @@
 # discord-random-message-bot
-discordのログをランダムで表示するbot（ChatGPT作）
+discord内全てのチャンネルからランダムで11件メッセージを表示するbot（ChatGPT作）
 
 ### 書き換える箇所
 > TOKEN = 'YOUR_DISCORD_BOT_TOKEN'  # あなたのボットのトークン
