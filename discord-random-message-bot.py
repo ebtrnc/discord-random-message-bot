@@ -15,6 +15,8 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 TOKEN = 'YOUR_DISCORD_BOT_TOKEN'  # あなたのボットのトークン
 TARGET_CHANNEL_ID = YOUR_TARGET_CHANNEL_ID  # メッセージを送信したい出力先のチャネルのID
 DATA_FILE = os.path.join(os.path.dirname(__file__), 'saved_messages.json')  # 保存するファイルの名前
+EXCLUDED_CHANNEL_IDS = [EXCLUDED_CHANNEL_ID_1, EXCLUDED_CHANNEL_ID_2]  # 除外するチャンネルのIDリスト
+ALLOWED_CHANNEL_IDS = [ALLOWED_CHANNEL_ID_1, ALLOWED_CHANNEL_ID_2]  # コマンド実行を許可するチャンネルのIDリスト
 
 def message_to_dict(message):
     return {
@@ -69,6 +71,11 @@ async def on_ready():
 
 @bot.command(name='11')
 async def random_message(ctx):
+    # コマンド実行を許可されたチャンネルでのみ実行
+    if ctx.channel.id not in ALLOWED_CHANNEL_IDS:
+        await ctx.send('このチャンネルではコマンドを実行できません。')
+        return
+
     try:
         all_messages = load_messages()
 
@@ -97,6 +104,7 @@ async def random_message(ctx):
                     response = f'> {random_message.get("content")}\n{message_link}'
                 
                 await target_channel.send(response)
+            await ctx.send('メッセージの書き込みが完了しました。')  # 完了メッセージを送信
             print('メッセージの書き込みが完了しました')
         else:
             await ctx.send('メッセージが見つかりませんでした。')
@@ -105,11 +113,29 @@ async def random_message(ctx):
         print(f'コマンド実行中にエラーが発生しました: {e}')
         await ctx.send('コマンド実行中にエラーが発生しました。')
 
+@bot.command(name='11-json')
+async def update_json(ctx):
+    # コマンド実行を許可されたチャンネルでのみ実行
+    if ctx.channel.id not in ALLOWED_CHANNEL_IDS:
+        await ctx.send('このチャンネルではコマンドを実行できません。')
+        return
+
+    try:
+        await ctx.send('全メッセージを再取得してJSONファイルを更新します...')
+        all_messages = await retrieve_and_save_messages(ctx)
+        if all_messages:
+            await ctx.send('JSONファイルの更新が完了しました。')
+        else:
+            await ctx.send('メッセージが見つかりませんでした。')
+    except Exception as e:
+        print(f'コマンド実行中にエラーが発生しました: {e}')
+        await ctx.send('コマンド実行中にエラーが発生しました。')
+
 async def retrieve_and_save_messages(ctx):
     all_messages = []
 
-    # サーバー内の全チャンネルIDを取得
-    source_channel_ids = [channel.id for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel)]
+    # サーバー内の全チャンネルIDを取得し、除外チャンネルをフィルタリング
+    source_channel_ids = [channel.id for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel) and channel.id not in EXCLUDED_CHANNEL_IDS]
     print(f'チャンネルIDの取得が完了しました: {source_channel_ids}')
 
     for channel_id in source_channel_ids:
