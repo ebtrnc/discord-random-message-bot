@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import random
 import asyncio
+import os
+import json
 
 # Intentsを設定
 intents = discord.Intents.default()
@@ -11,51 +13,124 @@ intents.message_content = True  # メッセージ内容を取得するために�
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 TOKEN = 'YOUR_DISCORD_BOT_TOKEN'  # あなたのボットのトークン
-SOURCE_CHANNEL_IDS = [YOUR_CHANNEL_ID_1, YOUR_CHANNEL_ID_2]  # メッセージを取得したい複数のチャネルのID
 TARGET_CHANNEL_ID = YOUR_TARGET_CHANNEL_ID  # メッセージを送信したい出力先のチャネルのID
+DATA_FILE = os.path.join(os.path.dirname(__file__), 'saved_messages.json')  # 保存するファイルの名前
+
+def message_to_dict(message):
+    return {
+        'id': message.id,
+        'channel': {
+            'id': message.channel.id
+        },
+        'guild': {
+            'id': message.guild.id
+        },
+        'content': message.content,
+        'author': {
+            'id': message.author.id,
+            'name': message.author.name
+        },
+        'attachments': [{'url': attachment.url} for attachment in message.attachments]
+    }
+
+async def save_messages(messages):
+    try:
+        if messages:
+            with open(DATA_FILE, 'w', encoding='utf-8') as f:
+                json.dump(messages, f, ensure_ascii=False, indent=4)
+            print(f'メッセージの保存が完了しました。ファイルパス: {DATA_FILE}')
+        else:
+            print('保存するメッセージがありません')
+    except Exception as e:
+        print(f'メッセージの保存中にエラーが発生しました: {e}')
+
+def load_messages():
+    if os.path.exists(DATA_FILE):
+        try:
+            with open(DATA_FILE, 'r', encoding='utf-8') as f:
+                data = f.read().strip()
+                if not data:
+                    print('JSONファイルが空です')
+                    return []
+                return json.loads(data)
+        except json.JSONDecodeError as e:
+            print(f'JSONの読み込み中にエラーが発生しました: {e}')
+            return []
+        except Exception as e:
+            print(f'ファイルの読み込み中にエラーが発生しました: {e}')
+            return []
+    else:
+        print('データファイルが存在しません')
+        return []
 
 @bot.event
 async def on_ready():
     print(f'We have logged in as {bot.user}')
 
-@bot.command(name='run')
+@bot.command(name='11')
 async def random_message(ctx):
-    await send_random_message(ctx)
+    try:
+        all_messages = load_messages()
 
-async def send_random_message(ctx):
-    target_channel = bot.get_channel(TARGET_CHANNEL_ID)
-    if target_channel is None:
-        await ctx.send(f'出力先のチャンネルID {TARGET_CHANNEL_ID} が見つかりません。')
-        return
+        if not all_messages:
+            # JSONファイルが存在しない場合は全メッセージを取得して保存する
+            await ctx.send('初回起動です。メッセージを取得しています...')
+            all_messages = await retrieve_and_save_messages(ctx)
+        else:
+            await ctx.send('保存されたメッセージを表示します...')
+        
+        if all_messages:
+            random_messages = random.sample(all_messages, min(11, len(all_messages)))  # 11件のメッセージをランダムに選択
+            target_channel = bot.get_channel(TARGET_CHANNEL_ID)
+            if target_channel is None:
+                await ctx.send(f'出力先のチャンネルID {TARGET_CHANNEL_ID} が見つかりません。')
+                return
+            
+            for random_message in random_messages:
+                message_link = f"https://discord.com/channels/{random_message['guild']['id']}/{random_message['channel']['id']}/{random_message['id']}"
+                
+                # 画像のURLを抽出
+                if random_message.get('attachments'):
+                    image_urls = [attachment['url'] for attachment in random_message['attachments']]
+                    response = f'> {random_message.get("content")}\n{message_link}\n' + '\n'.join(image_urls)
+                else:
+                    response = f'> {random_message.get("content")}\n{message_link}'
+                
+                await target_channel.send(response)
+            print('メッセージの書き込みが完了しました')
+        else:
+            await ctx.send('メッセージが見つかりませんでした。')
 
+    except Exception as e:
+        print(f'コマンド実行中にエラーが発生しました: {e}')
+        await ctx.send('コマンド実行中にエラーが発生しました。')
+
+async def retrieve_and_save_messages(ctx):
     all_messages = []
-    
-    for channel_id in SOURCE_CHANNEL_IDS:
+
+    # サーバー内の全チャンネルIDを取得
+    source_channel_ids = [channel.id for channel in ctx.guild.channels if isinstance(channel, discord.TextChannel)]
+    print(f'チャンネルIDの取得が完了しました: {source_channel_ids}')
+
+    for channel_id in source_channel_ids:
         channel = bot.get_channel(channel_id)
         if channel is None:
             await ctx.send(f'メッセージ取得元のチャンネルID {channel_id} が見つかりません。')
             continue
-        
+
         messages = []
-        async for message in channel.history(limit=100):  # 最新の100件のメッセージを取得
-            messages.append(message)
+        try:
+            async for message in channel.history(limit=None):  # 全メッセージを取得
+                messages.append(message_to_dict(message))
+            print(f'チャンネル {channel_id} から {len(messages)} 件のメッセージを取得しました')
+        except Exception as e:
+            print(f'チャンネル {channel_id} のメッセージ取得中にエラーが発生しました: {e}')
         
         all_messages.extend(messages)
-    
-    if all_messages:
-        random_message = random.choice(all_messages)
-        message_link = f"https://discord.com/channels/{random_message.guild.id}/{random_message.channel.id}/{random_message.id}"
-        
-        # 画像のURLを抽出
-        if random_message.attachments:
-            image_urls = [attachment.url for attachment in random_message.attachments]
-            response = f'> {random_message.content}\n{message_link}\n' + '\n'.join(image_urls)
-        else:
-            response = f'> {random_message.content}\n{message_link}'
-        
-        await target_channel.send(response)
-    else:
-        await ctx.send('メッセージが見つかりませんでした。')
+
+    print(f'全メッセージの取得が完了しました。合計メッセージ数: {len(all_messages)}')
+    await save_messages(all_messages)
+    return all_messages
 
 async def keep_bot_running():
     while True:
